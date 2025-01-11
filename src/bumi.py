@@ -15,6 +15,41 @@ def pretty_print_json(json_object):
     print(json.dumps(json_object, indent=4))
 
 
+def scrape_letterboxd_user_watchlist(target_url):
+    """
+    scrapes a user's watchlist from letterboxd
+    """
+    modified_target_url = f"{target_url}watchlist/"
+    user_watchlist_array = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(modified_target_url)
+            print(f"Success: Retrieved page URL {modified_target_url}")
+
+            page.wait_for_selector("ul.poster-list")
+            main_section = page.query_selector("ul.poster-list")
+            for poster in main_section.query_selector_all("li.poster-container"):
+                film_name = poster.query_selector("div").get_attribute("data-film-name")
+                film_poster_image = poster.query_selector("div img").get_attribute(
+                    "src"
+                )
+                user_watchlist_array.append(
+                    {
+                        "film_name": film_name,
+                        "film_poster_image": film_poster_image,
+                    }
+                )
+
+        except Exception as e:
+            print(f"Error: Unable to process {modified_target_url}: {e}")
+        page.close()
+        browser.close()
+
+    return user_watchlist_array
+
+
 def scrape_letterboxd_user(target_url):
     """
     scrapes user data from letterboxd
@@ -23,7 +58,6 @@ def scrape_letterboxd_user(target_url):
     user_favourite_films_array = []
     user_recent_activity_array = []
     with sync_playwright() as p:
-        # browser = p.chromium.launch(headless=False)
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
         try:
@@ -125,6 +159,7 @@ def scrape_letterboxd_user(target_url):
                     },
                 },
             }
+
         except Exception as e:
             print(f"Error: Unable to process {target_url}: {e}")
         page.close()
@@ -132,6 +167,12 @@ def scrape_letterboxd_user(target_url):
     return user_data
 
 
-if __name__ == "__main__":
-    TARGET_URL = "https://letterboxd.com/gongtalksfilm/"
-    pretty_print_json(scrape_letterboxd_user(TARGET_URL))
+def scrape_letterboxd(target_url):
+    """
+    wrapper function for user interfacing
+    """
+    buffer = scrape_letterboxd_user(target_url)
+    watchlist = scrape_letterboxd_user_watchlist(target_url)
+    if watchlist:
+        buffer["scraped_data"]["films"]["watchlist"] = watchlist
+    return buffer

@@ -22,7 +22,7 @@ $ git clone https://github.com/gongahkia/bumi
 import bumi
 
 USER_LETTERBOXD_PROFILE = "https://letterboxd.com/<user_profile>/"
-result = bumi.scrape_letterboxd_user(USER_LETTERBOXD_PROFILE)
+result = bumi.scrape_letterboxd(USER_LETTERBOXD_PROFILE)
 ```
 
 3. Scraped output is returned as a dictionary.
