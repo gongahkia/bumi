@@ -4,7 +4,7 @@
 
 Quick and dirty [Letterboxd](https://letterboxd.com/) profile scraper.
 
-Implemented in [2 hours and 11 minutes]().
+Implemented in [1 hour and 47 minutes](https://github.com/gongahkia/bumi/commit/01a5cb7572e1df6f4f3b13bccbf42262fb16f579).
 
 ## Rationale 
 
