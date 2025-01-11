@@ -4,9 +4,13 @@
 
 Quick and dirty [Letterboxd](https://letterboxd.com/) profile scraper.
 
-Bumi is open-source and authentication-free.
-
 Implemented in [2 hours and 11 minutes]().
+
+## Rationale 
+
+[Letterboxd's official API](https://api-docs.letterboxd.com/) is [closed-source](https://www.reddit.com/r/Letterboxd/comments/knu50f/has_anybody_tried_using_the_letterboxd_api/) and requires [oauth2](https://api-docs.letterboxd.com/#auth).
+
+[`Bumi`](https://github.com/gongahkia/bumi) is open-source and authentication-free.
 
 ## Usage
 
@@ -16,7 +20,7 @@ Implemented in [2 hours and 11 minutes]().
 $ git clone https://github.com/gongahkia/bumi
 ```
 
-2. Call `scrape_letterboxd_user()`.
+2. Call `scrape_letterboxd()`.
 
 ```py
 import bumi
