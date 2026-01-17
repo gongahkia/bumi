@@ -578,6 +578,82 @@ def parse_runtime_string(runtime_str):
     return total if total > 0 else None
 
 
+def extract_bio_links(target_url):
+    """
+    extracts links and social media accounts from user bio
+
+    Args:
+        target_url: letterboxd user profile URL
+
+    Returns:
+        dict with extracted links and social accounts
+    """
+    import re
+    result = {
+        "website": None,
+        "twitter": None,
+        "instagram": None,
+        "letterboxd_pro": False,
+        "letterboxd_patron": False,
+        "bio_links": [],
+    }
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(target_url)
+            print(f"Success: Retrieved profile for bio links {target_url}")
+
+            # check for pro/patron badges
+            pro_badge = page.query_selector("span.badge.-pro")
+            if pro_badge:
+                result["letterboxd_pro"] = True
+            patron_badge = page.query_selector("span.badge.-patron")
+            if patron_badge:
+                result["letterboxd_patron"] = True
+
+            # extract website link
+            website_link = page.query_selector("a.icon-website")
+            if website_link:
+                result["website"] = website_link.get_attribute("href")
+
+            # extract twitter link
+            twitter_link = page.query_selector("a.icon-twitter")
+            if twitter_link:
+                href = twitter_link.get_attribute("href")
+                result["twitter"] = href
+                # extract username from URL
+                match = re.search(r"twitter\.com/(\w+)", href)
+                if match:
+                    result["twitter_username"] = match.group(1)
+
+            # extract all links from bio text
+            bio_section = page.query_selector("div.bio.js-bio")
+            if bio_section:
+                links = bio_section.query_selector_all("a")
+                for link in links:
+                    href = link.get_attribute("href")
+                    text = link.inner_text().strip()
+                    if href:
+                        link_data = {"url": href, "text": text}
+                        result["bio_links"].append(link_data)
+
+                        # detect instagram
+                        if "instagram.com" in href.lower():
+                            result["instagram"] = href
+                            match = re.search(r"instagram\.com/(\w+)", href)
+                            if match:
+                                result["instagram_username"] = match.group(1)
+
+        except Exception as e:
+            print(f"Error extracting bio links: {e}")
+        page.close()
+        browser.close()
+
+    return result
+
+
 # ----- HELPER FUNCTIONS -----
 
 
