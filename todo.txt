@@ -1,4 +1,3 @@
-Implement diary entry scraping to capture watch dates and rewatch history from user profiles
 Add list scraping capability to extract custom user-created lists with all films and list metadata
 Scrape follower and following counts and optionally extract the full follower/following user lists
 Create a caching layer with TTL support to avoid re-scraping unchanged profiles within configurable timeframes

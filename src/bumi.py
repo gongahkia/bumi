@@ -223,6 +223,130 @@ def scrape_user_diary(target_url, paginate=True, max_pages=100):
     return diary_entries
 
 
+def scrape_user_lists(target_url, paginate=True, max_pages=20):
+    """
+    scrapes all lists created by a user from letterboxd
+    """
+    base_lists_url = f"{target_url}lists/"
+    lists_array = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        current_page = 1
+        try:
+            while True:
+                if current_page == 1:
+                    page_url = base_lists_url
+                else:
+                    page_url = f"{base_lists_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved lists page {page_url}")
+
+                list_items = page.query_selector_all("section.list-set")
+                if not list_items:
+                    break
+
+                for item in list_items:
+                    list_data = {
+                        "list_name": None,
+                        "list_url": None,
+                        "description": None,
+                        "film_count": None,
+                    }
+
+                    title_el = item.query_selector("h2.title a")
+                    if title_el:
+                        list_data["list_name"] = title_el.inner_text().strip()
+                        list_data["list_url"] = title_el.get_attribute("href")
+
+                    desc_el = item.query_selector("div.body-text p")
+                    if desc_el:
+                        list_data["description"] = desc_el.inner_text().strip()
+
+                    count_el = item.query_selector("small.value")
+                    if count_el:
+                        list_data["film_count"] = count_el.inner_text().strip()
+
+                    lists_array.append(list_data)
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process lists page {current_page}: {e}")
+        page.close()
+        browser.close()
+
+    return lists_array
+
+
+def scrape_list_contents(list_url, paginate=True, max_pages=50):
+    """
+    scrapes all films from a specific letterboxd list
+    """
+    full_url = f"https://letterboxd.com{list_url}" if list_url.startswith("/") else list_url
+    list_contents = {
+        "list_url": list_url,
+        "films": [],
+    }
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        current_page = 1
+        try:
+            while True:
+                if current_page == 1:
+                    page_url = full_url
+                else:
+                    page_url = f"{full_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved list page {page_url}")
+
+                title_el = page.query_selector("h1.title-1")
+                if title_el and current_page == 1:
+                    list_contents["list_name"] = title_el.inner_text().strip()
+
+                desc_el = page.query_selector("div.body-text")
+                if desc_el and current_page == 1:
+                    list_contents["description"] = desc_el.inner_text().strip()
+
+                posters = page.query_selector_all("li.poster-container")
+                if not posters:
+                    break
+
+                for poster in posters:
+                    film_div = poster.query_selector("div.film-poster")
+                    if film_div:
+                        film_data = {
+                            "film_name": film_div.get_attribute("data-film-name"),
+                            "film_slug": film_div.get_attribute("data-film-slug"),
+                        }
+                        img = poster.query_selector("img")
+                        if img:
+                            film_data["film_poster_image"] = img.get_attribute("src")
+                        list_contents["films"].append(film_data)
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process list page {current_page}: {e}")
+        page.close()
+        browser.close()
+
+    return list_contents
+
+
 def pretty_print_json(json_object):
     """
     pretty prints the json to
