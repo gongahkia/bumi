@@ -1,4 +1,3 @@
-Implement webhook notifications for completed scrape jobs in API server mode
 Add film search functionality to find films by title and return Letterboxd metadata
 Extract popular reviews and recent news from user's followed accounts activity feed
 Implement user comparison feature to find common and unique films between two profiles

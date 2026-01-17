@@ -3153,3 +3153,202 @@ def scrape_with_webhook(target_url, webhook_url=None, paginate=True):
             "error": str(e),
         })
         raise
+
+
+# ----- FILM SEARCH -----
+
+def search_films(query, max_results=20):
+    """
+    searches letterboxd for films by title
+
+    Args:
+        query: search query string
+        max_results: maximum number of results to return
+
+    Returns:
+        list of film results with title, year, slug, and poster
+    """
+    import urllib.parse
+    encoded_query = urllib.parse.quote(query)
+    search_url = f"https://letterboxd.com/search/films/{encoded_query}/"
+    results = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(search_url)
+            print(f"Success: Searching for '{query}'")
+
+            film_results = page.query_selector_all("ul.results li.film-detail")
+
+            for i, item in enumerate(film_results):
+                if i >= max_results:
+                    break
+
+                film_data = {
+                    "title": None,
+                    "year": None,
+                    "film_slug": None,
+                    "director": None,
+                    "poster_url": None,
+                }
+
+                poster = item.query_selector("div.film-poster")
+                if poster:
+                    film_data["film_slug"] = poster.get_attribute("data-film-slug")
+                    img = poster.query_selector("img")
+                    if img:
+                        film_data["poster_url"] = img.get_attribute("src")
+
+                title_el = item.query_selector("h2.headline-2 a")
+                if title_el:
+                    film_data["title"] = title_el.inner_text().strip()
+
+                year_el = item.query_selector("h2.headline-2 small a")
+                if year_el:
+                    film_data["year"] = year_el.inner_text().strip()
+
+                director_el = item.query_selector("p.film-detail-content a")
+                if director_el:
+                    film_data["director"] = director_el.inner_text().strip()
+
+                results.append(film_data)
+
+        except Exception as e:
+            print(f"Error searching for '{query}': {e}")
+        page.close()
+        browser.close()
+
+    return results
+
+
+def search_films_advanced(query, filters=None, max_results=20):
+    """
+    advanced film search with filters
+
+    Args:
+        query: search query string
+        filters: dict with optional filters:
+            - decade: e.g., "2020s", "1990s"
+            - genre: e.g., "horror", "comedy"
+            - year: specific year
+        max_results: maximum results to return
+
+    Returns:
+        list of film results
+    """
+    import urllib.parse
+
+    base_url = "https://letterboxd.com/films/"
+    params = []
+
+    if filters:
+        if filters.get("decade"):
+            base_url += f"decade/{filters['decade']}/"
+        if filters.get("genre"):
+            base_url += f"genre/{filters['genre']}/"
+        if filters.get("year"):
+            base_url += f"year/{filters['year']}/"
+
+    search_url = base_url
+    results = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(search_url)
+            print(f"Success: Advanced search at {search_url}")
+
+            posters = page.query_selector_all("li.poster-container")
+
+            for i, poster_container in enumerate(posters):
+                if i >= max_results:
+                    break
+
+                film_data = {
+                    "title": None,
+                    "film_slug": None,
+                    "poster_url": None,
+                }
+
+                poster = poster_container.query_selector("div.film-poster")
+                if poster:
+                    film_data["title"] = poster.get_attribute("data-film-name")
+                    film_data["film_slug"] = poster.get_attribute("data-film-slug")
+
+                img = poster_container.query_selector("img")
+                if img:
+                    film_data["poster_url"] = img.get_attribute("src")
+
+                if film_data["title"]:
+                    results.append(film_data)
+
+        except Exception as e:
+            print(f"Error in advanced search: {e}")
+        page.close()
+        browser.close()
+
+    return results
+
+
+def get_popular_films(time_period="week", max_results=20):
+    """
+    gets popular films on letterboxd
+
+    Args:
+        time_period: 'week', 'month', or 'year'
+        max_results: maximum results to return
+
+    Returns:
+        list of popular films
+    """
+    period_map = {
+        "week": "this/week/",
+        "month": "this/month/",
+        "year": "this/year/",
+    }
+
+    period_path = period_map.get(time_period, "this/week/")
+    url = f"https://letterboxd.com/films/popular/{period_path}"
+    results = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(url)
+            print(f"Success: Getting popular films for {time_period}")
+
+            posters = page.query_selector_all("li.poster-container")
+
+            for i, poster_container in enumerate(posters):
+                if i >= max_results:
+                    break
+
+                film_data = {
+                    "title": None,
+                    "film_slug": None,
+                    "poster_url": None,
+                    "rank": i + 1,
+                }
+
+                poster = poster_container.query_selector("div.film-poster")
+                if poster:
+                    film_data["title"] = poster.get_attribute("data-film-name")
+                    film_data["film_slug"] = poster.get_attribute("data-film-slug")
+
+                img = poster_container.query_selector("img")
+                if img:
+                    film_data["poster_url"] = img.get_attribute("src")
+
+                if film_data["title"]:
+                    results.append(film_data)
+
+        except Exception as e:
+            print(f"Error getting popular films: {e}")
+        page.close()
+        browser.close()
+
+    return results
