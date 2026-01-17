@@ -1491,6 +1491,182 @@ def aggregate_batch_results(batch_results):
     return aggregated
 
 
+# ----- DELTA DETECTION -----
+
+def compute_delta(old_data, new_data, path=""):
+    """
+    computes differences between two data structures
+
+    Args:
+        old_data: previous scrape data
+        new_data: current scrape data
+        path: current path in data structure (for nested diffs)
+
+    Returns:
+        dict with added, removed, and changed items
+    """
+    delta = {
+        "added": [],
+        "removed": [],
+        "changed": [],
+    }
+
+    if type(old_data) != type(new_data):
+        delta["changed"].append({
+            "path": path or "root",
+            "old": old_data,
+            "new": new_data,
+        })
+        return delta
+
+    if isinstance(old_data, dict):
+        old_keys = set(old_data.keys())
+        new_keys = set(new_data.keys())
+
+        for key in new_keys - old_keys:
+            delta["added"].append({
+                "path": f"{path}.{key}" if path else key,
+                "value": new_data[key],
+            })
+
+        for key in old_keys - new_keys:
+            delta["removed"].append({
+                "path": f"{path}.{key}" if path else key,
+                "value": old_data[key],
+            })
+
+        for key in old_keys & new_keys:
+            sub_path = f"{path}.{key}" if path else key
+            sub_delta = compute_delta(old_data[key], new_data[key], sub_path)
+            delta["added"].extend(sub_delta["added"])
+            delta["removed"].extend(sub_delta["removed"])
+            delta["changed"].extend(sub_delta["changed"])
+
+    elif isinstance(old_data, list):
+        old_set = set(str(x) for x in old_data if not isinstance(x, dict))
+        new_set = set(str(x) for x in new_data if not isinstance(x, dict))
+
+        for item in new_set - old_set:
+            delta["added"].append({"path": path, "value": item})
+        for item in old_set - new_set:
+            delta["removed"].append({"path": path, "value": item})
+
+        # for dicts in lists, compare by film_name or other key
+        old_dicts = {d.get("film_name") or d.get("film_slug") or str(i): d
+                     for i, d in enumerate(old_data) if isinstance(d, dict)}
+        new_dicts = {d.get("film_name") or d.get("film_slug") or str(i): d
+                     for i, d in enumerate(new_data) if isinstance(d, dict)}
+
+        for key in set(new_dicts.keys()) - set(old_dicts.keys()):
+            delta["added"].append({"path": f"{path}[{key}]", "value": new_dicts[key]})
+        for key in set(old_dicts.keys()) - set(new_dicts.keys()):
+            delta["removed"].append({"path": f"{path}[{key}]", "value": old_dicts[key]})
+
+    else:
+        if old_data != new_data:
+            delta["changed"].append({
+                "path": path,
+                "old": old_data,
+                "new": new_data,
+            })
+
+    return delta
+
+
+def detect_profile_changes(old_profile, new_profile):
+    """
+    detects changes between two profile scrapes
+
+    Args:
+        old_profile: previous profile scrape result
+        new_profile: current profile scrape result
+
+    Returns:
+        dict with summary and detailed changes
+    """
+    delta = compute_delta(old_profile, new_profile)
+
+    summary = {
+        "has_changes": bool(delta["added"] or delta["removed"] or delta["changed"]),
+        "total_additions": len(delta["added"]),
+        "total_removals": len(delta["removed"]),
+        "total_changes": len(delta["changed"]),
+        "delta": delta,
+    }
+
+    # detect specific changes
+    summary["watchlist_changes"] = [
+        c for c in delta["added"] + delta["removed"]
+        if "watchlist" in c.get("path", "")
+    ]
+    summary["favourite_changes"] = [
+        c for c in delta["added"] + delta["removed"]
+        if "favourite" in c.get("path", "")
+    ]
+    summary["profile_changes"] = [
+        c for c in delta["changed"]
+        if "profile" in c.get("path", "")
+    ]
+
+    return summary
+
+
+def save_snapshot(data, username, snapshot_dir=None):
+    """
+    saves a snapshot of scrape data for later comparison
+
+    Args:
+        data: scrape data to save
+        username: letterboxd username
+        snapshot_dir: directory for snapshots (default: ~/.bumi_snapshots)
+
+    Returns:
+        path to saved snapshot
+    """
+    if snapshot_dir is None:
+        snapshot_dir = Path.home() / ".bumi_snapshots"
+    snapshot_dir = Path(snapshot_dir)
+    snapshot_dir.mkdir(exist_ok=True)
+
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    filename = f"{username}_{timestamp}.json"
+    filepath = snapshot_dir / filename
+
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
+
+    return str(filepath)
+
+
+def load_latest_snapshot(username, snapshot_dir=None):
+    """
+    loads the most recent snapshot for a user
+
+    Args:
+        username: letterboxd username
+        snapshot_dir: directory for snapshots
+
+    Returns:
+        tuple of (data, filepath) or (None, None) if no snapshot
+    """
+    if snapshot_dir is None:
+        snapshot_dir = Path.home() / ".bumi_snapshots"
+    snapshot_dir = Path(snapshot_dir)
+
+    if not snapshot_dir.exists():
+        return None, None
+
+    snapshots = sorted(snapshot_dir.glob(f"{username}_*.json"), reverse=True)
+    if not snapshots:
+        return None, None
+
+    latest = snapshots[0]
+    with open(latest, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    return data, str(latest)
+
+
 # ----- HELPER FUNCTIONS -----
 
 

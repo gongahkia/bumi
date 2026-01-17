@@ -1,4 +1,3 @@
-Implement batch profile scraping to process multiple usernames with aggregated results
 Add delta detection to compare current scrape against previous data and report changes
 Create configurable CSS selector system loaded from external config file for easy updates
 Implement custom exception types for specific error conditions like ProfileNotFound and RateLimited
