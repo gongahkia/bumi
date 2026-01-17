@@ -1,4 +1,3 @@
-Scrape follower and following counts and optionally extract the full follower/following user lists
 Create a caching layer with TTL support to avoid re-scraping unchanged profiles within configurable timeframes
 Implement retry mechanism with exponential backoff for handling transient network failures gracefully
 Add configurable rate limiting with politeness delays between requests to respect server resources
