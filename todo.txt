@@ -1,4 +1,3 @@
-Extract user bio links and connected social media accounts from profile pages
 Implement multiple output format support including CSV and XML export alongside JSON
 Add SQLite storage backend for persisting scraped data locally with query support
 Create PostgreSQL storage adapter for production-grade data persistence
