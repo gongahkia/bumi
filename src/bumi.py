@@ -15,39 +15,115 @@ def pretty_print_json(json_object):
     print(json.dumps(json_object, indent=4))
 
 
-def scrape_letterboxd_user_watchlist(target_url):
+def scrape_letterboxd_user_watchlist(target_url, paginate=True, max_pages=50):
     """
-    scrapes a user's watchlist from letterboxd
+    scrapes a user's watchlist from letterboxd with pagination support
     """
-    modified_target_url = f"{target_url}watchlist/"
+    base_watchlist_url = f"{target_url}watchlist/"
     user_watchlist_array = []
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
+        current_page = 1
         try:
-            page.goto(modified_target_url)
-            print(f"Success: Retrieved page URL {modified_target_url}")
+            while True:
+                if current_page == 1:
+                    page_url = base_watchlist_url
+                else:
+                    page_url = f"{base_watchlist_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved page URL {page_url}")
 
-            page.wait_for_selector("ul.poster-list")
-            main_section = page.query_selector("ul.poster-list")
-            for poster in main_section.query_selector_all("li.poster-container"):
-                film_name = poster.query_selector("div").get_attribute("data-film-name")
-                film_poster_image = poster.query_selector("div img").get_attribute(
-                    "src"
-                )
-                user_watchlist_array.append(
-                    {
-                        "film_name": film_name,
-                        "film_poster_image": film_poster_image,
-                    }
-                )
+                poster_list = page.query_selector("ul.poster-list")
+                if not poster_list:
+                    break
+
+                posters = poster_list.query_selector_all("li.poster-container")
+                if not posters:
+                    break
+
+                for poster in posters:
+                    film_name = poster.query_selector("div").get_attribute("data-film-name")
+                    film_poster_image = poster.query_selector("div img").get_attribute("src")
+                    user_watchlist_array.append(
+                        {
+                            "film_name": film_name,
+                            "film_poster_image": film_poster_image,
+                        }
+                    )
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
 
         except Exception as e:
-            print(f"Error: Unable to process {modified_target_url}: {e}")
+            print(f"Error: Unable to process watchlist page {current_page}: {e}")
         page.close()
         browser.close()
 
     return user_watchlist_array
+
+
+def scrape_letterboxd_user_films(target_url, paginate=True, max_pages=100):
+    """
+    scrapes all films a user has logged with pagination support
+    """
+    base_films_url = f"{target_url}films/"
+    user_films_array = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        current_page = 1
+        try:
+            while True:
+                if current_page == 1:
+                    page_url = base_films_url
+                else:
+                    page_url = f"{base_films_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved films page URL {page_url}")
+
+                poster_list = page.query_selector("ul.poster-list")
+                if not poster_list:
+                    break
+
+                posters = poster_list.query_selector_all("li.poster-container")
+                if not posters:
+                    break
+
+                for poster in posters:
+                    film_div = poster.query_selector("div.film-poster")
+                    if film_div:
+                        film_name = film_div.get_attribute("data-film-name")
+                        film_slug = film_div.get_attribute("data-film-slug")
+                        img = poster.query_selector("div img")
+                        film_poster_image = img.get_attribute("src") if img else None
+                        user_films_array.append(
+                            {
+                                "film_name": film_name,
+                                "film_slug": film_slug,
+                                "film_poster_image": film_poster_image,
+                            }
+                        )
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process films page {current_page}: {e}")
+        page.close()
+        browser.close()
+
+    return user_films_array
 
 
 def scrape_letterboxd_user(target_url):
@@ -167,12 +243,15 @@ def scrape_letterboxd_user(target_url):
     return user_data
 
 
-def scrape_letterboxd(target_url):
+def scrape_letterboxd(target_url, paginate=True):
     """
     wrapper function for user interfacing
     """
     buffer = scrape_letterboxd_user(target_url)
-    watchlist = scrape_letterboxd_user_watchlist(target_url)
+    watchlist = scrape_letterboxd_user_watchlist(target_url, paginate=paginate)
+    all_films = scrape_letterboxd_user_films(target_url, paginate=paginate)
     if watchlist:
         buffer["scraped_data"]["films"]["watchlist"] = watchlist
+    if all_films:
+        buffer["scraped_data"]["films"]["all_films"] = all_films
     return buffer

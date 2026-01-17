@@ -1,0 +1,30 @@
+Implement pagination support to scrape all favourite films, watchlist items, and activity beyond the first page
+Add film detail extraction including release year, director, genre, runtime, and average rating from film pages
+Extract user's personal ratings and written reviews for each film they've logged
+Implement diary entry scraping to capture watch dates and rewatch history from user profiles
+Add list scraping capability to extract custom user-created lists with all films and list metadata
+Scrape follower and following counts and optionally extract the full follower/following user lists
+Create a caching layer with TTL support to avoid re-scraping unchanged profiles within configurable timeframes
+Implement retry mechanism with exponential backoff for handling transient network failures gracefully
+Add configurable rate limiting with politeness delays between requests to respect server resources
+Create browser pool management for concurrent profile scraping with connection reuse
+Implement request timeout handling with configurable timeouts for page loads and element waits
+Add progress tracking callbacks for long-running scrape operations on large profiles or batch jobs
+Parse user statistics into structured numeric values including films watched, hours logged, and average rating
+Extract user bio links and connected social media accounts from profile pages
+Implement multiple output format support including CSV and XML export alongside JSON
+Add SQLite storage backend for persisting scraped data locally with query support
+Create PostgreSQL storage adapter for production-grade data persistence
+Build async scraping support using Playwright's async API for improved performance
+Implement batch profile scraping to process multiple usernames with aggregated results
+Add delta detection to compare current scrape against previous data and report changes
+Create configurable CSS selector system loaded from external config file for easy updates
+Implement custom exception types for specific error conditions like ProfileNotFound and RateLimited
+Add input validation layer to verify URL format and check profile accessibility before scraping
+Create a FastAPI server exposing scraping functionality as RESTful HTTP endpoints
+Implement webhook notifications for completed scrape jobs in API server mode
+Add film search functionality to find films by title and return Letterboxd metadata
+Extract popular reviews and recent news from user's followed accounts activity feed
+Implement user comparison feature to find common and unique films between two profiles
+Add genre and decade breakdown extraction from user's watched films statistics page
+Create recommendation engine that suggests films based on user's favourites and high-rated films
