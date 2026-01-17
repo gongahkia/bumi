@@ -1,4 +1,3 @@
-Create configurable CSS selector system loaded from external config file for easy updates
 Implement custom exception types for specific error conditions like ProfileNotFound and RateLimited
 Add input validation layer to verify URL format and check profile accessibility before scraping
 Create a FastAPI server exposing scraping functionality as RESTful HTTP endpoints
