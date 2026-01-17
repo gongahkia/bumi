@@ -1349,6 +1349,148 @@ async def async_scrape_letterboxd(target_url):
     return user_data
 
 
+# ----- BATCH SCRAPING -----
+
+def batch_scrape_users(usernames, base_url="https://letterboxd.com/", progress_callback=None):
+    """
+    scrapes multiple user profiles with aggregated results
+
+    Args:
+        usernames: list of letterboxd usernames
+        base_url: base letterboxd URL
+        progress_callback: optional callback(current, total, message)
+
+    Returns:
+        dict with results, errors, and summary
+    """
+    results = {
+        "scraped_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "total_users": len(usernames),
+        "successful": 0,
+        "failed": 0,
+        "users": {},
+        "errors": [],
+    }
+
+    for i, username in enumerate(usernames):
+        if progress_callback:
+            progress_callback(i, len(usernames), f"Scraping {username}")
+
+        target_url = f"{base_url}{username}/"
+        try:
+            user_data = scrape_letterboxd(target_url)
+            results["users"][username] = user_data
+            results["successful"] += 1
+        except Exception as e:
+            error_msg = f"Failed to scrape {username}: {e}"
+            results["errors"].append({"username": username, "error": str(e)})
+            results["failed"] += 1
+            print(error_msg)
+
+        # apply rate limiting between requests
+        rate_limit_wait()
+
+    if progress_callback:
+        progress_callback(len(usernames), len(usernames), "Batch complete")
+
+    return results
+
+
+async def async_batch_scrape_users(usernames, base_url="https://letterboxd.com/", concurrency=3):
+    """
+    async batch scraping of multiple user profiles
+
+    Args:
+        usernames: list of letterboxd usernames
+        base_url: base letterboxd URL
+        concurrency: maximum concurrent scrapes
+
+    Returns:
+        dict with results, errors, and summary
+    """
+    import asyncio
+
+    results = {
+        "scraped_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "total_users": len(usernames),
+        "successful": 0,
+        "failed": 0,
+        "users": {},
+        "errors": [],
+    }
+
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def scrape_with_semaphore(username):
+        async with semaphore:
+            target_url = f"{base_url}{username}/"
+            try:
+                user_data = await async_scrape_letterboxd(target_url)
+                return (username, user_data, None)
+            except Exception as e:
+                return (username, None, str(e))
+
+    tasks = [scrape_with_semaphore(username) for username in usernames]
+    completed = await asyncio.gather(*tasks)
+
+    for username, user_data, error in completed:
+        if error:
+            results["errors"].append({"username": username, "error": error})
+            results["failed"] += 1
+        else:
+            results["users"][username] = user_data
+            results["successful"] += 1
+
+    return results
+
+
+def aggregate_batch_results(batch_results):
+    """
+    aggregates statistics from batch scrape results
+
+    Args:
+        batch_results: results from batch_scrape_users
+
+    Returns:
+        dict with aggregated statistics
+    """
+    aggregated = {
+        "total_users": batch_results["total_users"],
+        "successful": batch_results["successful"],
+        "failed": batch_results["failed"],
+        "total_films_watched": 0,
+        "total_watchlist_items": 0,
+        "common_films": {},
+        "all_favourite_films": [],
+    }
+
+    for username, user_data in batch_results.get("users", {}).items():
+        scraped = user_data.get("scraped_data", {})
+        films = scraped.get("films", {})
+
+        # count watchlist
+        watchlist = films.get("watchlist", [])
+        if watchlist:
+            aggregated["total_watchlist_items"] += len(watchlist)
+
+        # collect favourites
+        favourites = films.get("favourite_films", [])
+        for film in favourites:
+            film_name = film.get("film_name")
+            if film_name:
+                aggregated["all_favourite_films"].append(film_name)
+                if film_name not in aggregated["common_films"]:
+                    aggregated["common_films"][film_name] = 0
+                aggregated["common_films"][film_name] += 1
+
+    # sort common films by count
+    aggregated["common_films"] = dict(
+        sorted(aggregated["common_films"].items(), key=lambda x: x[1], reverse=True)
+    )
+
+    return aggregated
+
+
 # ----- HELPER FUNCTIONS -----
 
 
