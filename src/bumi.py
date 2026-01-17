@@ -71,6 +71,70 @@ def cache_clear_expired(ttl=DEFAULT_TTL):
         except (json.JSONDecodeError, IOError):
             cache_file.unlink()
 
+
+# ----- RETRY MECHANISM -----
+
+def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=30.0, exceptions=(Exception,)):
+    """
+    executes a function with exponential backoff retry logic
+
+    Args:
+        func: callable to execute
+        max_retries: maximum number of retry attempts
+        base_delay: initial delay in seconds
+        max_delay: maximum delay between retries
+        exceptions: tuple of exceptions to catch and retry
+
+    Returns:
+        result of func if successful, None if all retries fail
+    """
+    last_exception = None
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except exceptions as e:
+            last_exception = e
+            if attempt < max_retries:
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                print(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+            else:
+                print(f"All {max_retries + 1} attempts failed. Last error: {e}")
+    return None
+
+
+def make_request_with_retry(page, url, max_retries=3, base_delay=1.0):
+    """
+    navigates to a URL with retry logic for transient failures
+
+    Args:
+        page: playwright page object
+        url: URL to navigate to
+        max_retries: maximum retry attempts
+        base_delay: initial backoff delay
+
+    Returns:
+        True if successful, False otherwise
+    """
+    for attempt in range(max_retries + 1):
+        try:
+            response = page.goto(url)
+            if response and response.ok:
+                return True
+            if response and response.status >= 500:
+                raise Exception(f"Server error: {response.status}")
+            return True
+        except Exception as e:
+            if attempt < max_retries:
+                delay = min(base_delay * (2 ** attempt), 30.0)
+                print(f"Request failed (attempt {attempt + 1}): {e}. Retrying in {delay:.1f}s...")
+                time.sleep(delay)
+            else:
+                print(f"Request failed after {max_retries + 1} attempts: {e}")
+                return False
+    return False
+
+
 # ----- HELPER FUNCTIONS -----
 
 
