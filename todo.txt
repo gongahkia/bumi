@@ -1,4 +1,3 @@
-Add progress tracking callbacks for long-running scrape operations on large profiles or batch jobs
 Parse user statistics into structured numeric values including films watched, hours logged, and average rating
 Extract user bio links and connected social media accounts from profile pages
 Implement multiple output format support including CSV and XML export alongside JSON

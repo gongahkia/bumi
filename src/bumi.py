@@ -456,6 +456,128 @@ def make_request_with_retry(page, url, max_retries=3, base_delay=1.0):
     return False
 
 
+# ----- STATISTICS PARSING -----
+
+def parse_statistic_value(stat_string):
+    """
+    parses a statistic string into numeric value and label
+
+    Args:
+        stat_string: string like "1,234 films" or "523 following"
+
+    Returns:
+        dict with 'value' (int), 'label' (str), 'raw' (str)
+    """
+    import re
+    stat_string = stat_string.strip().lower()
+    result = {"value": None, "label": None, "raw": stat_string}
+
+    # match number with optional commas followed by label
+    match = re.match(r"([\d,]+)\s*(\w+)", stat_string)
+    if match:
+        num_str = match.group(1).replace(",", "")
+        result["value"] = int(num_str)
+        result["label"] = match.group(2)
+    return result
+
+
+def parse_user_statistics(stats_array):
+    """
+    parses array of user statistics into structured format
+
+    Args:
+        stats_array: list of strings like ["1,234 films", "523 following"]
+
+    Returns:
+        dict with parsed statistics including:
+        - films_watched: int
+        - films_this_year: int
+        - lists: int
+        - following: int
+        - followers: int
+        - raw: original array
+    """
+    result = {
+        "films_watched": None,
+        "films_this_year": None,
+        "lists": None,
+        "following": None,
+        "followers": None,
+        "raw": stats_array,
+    }
+
+    for stat in stats_array:
+        parsed = parse_statistic_value(stat)
+        if parsed["value"] is None:
+            continue
+
+        label = parsed["label"]
+        value = parsed["value"]
+
+        if label in ("films", "film"):
+            result["films_watched"] = value
+        elif label == "year" or "this year" in stat.lower():
+            result["films_this_year"] = value
+        elif label in ("lists", "list"):
+            result["lists"] = value
+        elif label == "following":
+            result["following"] = value
+        elif label in ("followers", "follower"):
+            result["followers"] = value
+
+    return result
+
+
+def parse_rating_string(rating_str):
+    """
+    parses a rating string into numeric value
+
+    Args:
+        rating_str: star rating like "★★★★" or "★★★½"
+
+    Returns:
+        float rating value (0.5 to 5.0) or None
+    """
+    if not rating_str:
+        return None
+
+    full_stars = rating_str.count("★")
+    half_stars = rating_str.count("½")
+    return full_stars + (0.5 * half_stars) if (full_stars or half_stars) else None
+
+
+def parse_runtime_string(runtime_str):
+    """
+    parses a runtime string into minutes
+
+    Args:
+        runtime_str: string like "142 mins" or "2h 22m"
+
+    Returns:
+        int minutes or None
+    """
+    import re
+    if not runtime_str:
+        return None
+
+    runtime_str = runtime_str.lower().strip()
+
+    # try "X mins" format
+    match = re.search(r"(\d+)\s*mins?", runtime_str)
+    if match:
+        return int(match.group(1))
+
+    # try "Xh Ym" format
+    hours_match = re.search(r"(\d+)\s*h", runtime_str)
+    mins_match = re.search(r"(\d+)\s*m", runtime_str)
+    total = 0
+    if hours_match:
+        total += int(hours_match.group(1)) * 60
+    if mins_match:
+        total += int(mins_match.group(1))
+    return total if total > 0 else None
+
+
 # ----- HELPER FUNCTIONS -----
 
 
