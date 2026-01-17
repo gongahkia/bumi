@@ -347,6 +347,126 @@ def scrape_list_contents(list_url, paginate=True, max_pages=50):
     return list_contents
 
 
+def scrape_user_followers(target_url, paginate=True, max_pages=50):
+    """
+    scrapes user's followers list from letterboxd
+    """
+    base_followers_url = f"{target_url}followers/"
+    followers_array = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        current_page = 1
+        try:
+            while True:
+                if current_page == 1:
+                    page_url = base_followers_url
+                else:
+                    page_url = f"{base_followers_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved followers page {page_url}")
+
+                follower_items = page.query_selector_all("table.person-table tr")
+                if not follower_items:
+                    break
+
+                for item in follower_items:
+                    user_data = {
+                        "username": None,
+                        "display_name": None,
+                        "profile_url": None,
+                        "avatar_url": None,
+                    }
+
+                    avatar = item.query_selector("td.table-person a.avatar img")
+                    if avatar:
+                        user_data["avatar_url"] = avatar.get_attribute("src")
+
+                    name_link = item.query_selector("td.table-person h3.title-3 a")
+                    if name_link:
+                        user_data["display_name"] = name_link.inner_text().strip()
+                        user_data["profile_url"] = name_link.get_attribute("href")
+                        if user_data["profile_url"]:
+                            user_data["username"] = user_data["profile_url"].strip("/")
+
+                    followers_array.append(user_data)
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process followers page {current_page}: {e}")
+        page.close()
+        browser.close()
+
+    return followers_array
+
+
+def scrape_user_following(target_url, paginate=True, max_pages=50):
+    """
+    scrapes user's following list from letterboxd
+    """
+    base_following_url = f"{target_url}following/"
+    following_array = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        current_page = 1
+        try:
+            while True:
+                if current_page == 1:
+                    page_url = base_following_url
+                else:
+                    page_url = f"{base_following_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved following page {page_url}")
+
+                following_items = page.query_selector_all("table.person-table tr")
+                if not following_items:
+                    break
+
+                for item in following_items:
+                    user_data = {
+                        "username": None,
+                        "display_name": None,
+                        "profile_url": None,
+                        "avatar_url": None,
+                    }
+
+                    avatar = item.query_selector("td.table-person a.avatar img")
+                    if avatar:
+                        user_data["avatar_url"] = avatar.get_attribute("src")
+
+                    name_link = item.query_selector("td.table-person h3.title-3 a")
+                    if name_link:
+                        user_data["display_name"] = name_link.inner_text().strip()
+                        user_data["profile_url"] = name_link.get_attribute("href")
+                        if user_data["profile_url"]:
+                            user_data["username"] = user_data["profile_url"].strip("/")
+
+                    following_array.append(user_data)
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process following page {current_page}: {e}")
+        page.close()
+        browser.close()
+
+    return following_array
+
+
 def pretty_print_json(json_object):
     """
     pretty prints the json to
