@@ -1,1 +1,0 @@
-Extract popular reviews and recent news from user's followed accounts activity feed
