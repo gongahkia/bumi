@@ -72,6 +72,58 @@ def cache_clear_expired(ttl=DEFAULT_TTL):
             cache_file.unlink()
 
 
+# ----- RATE LIMITING -----
+
+class RateLimiter:
+    """
+    rate limiter with configurable delays between requests
+    """
+
+    def __init__(self, min_delay=1.0, max_delay=3.0, randomize=True):
+        """
+        Args:
+            min_delay: minimum delay between requests in seconds
+            max_delay: maximum delay for randomized delays
+            randomize: if True, uses random delay between min and max
+        """
+        self.min_delay = min_delay
+        self.max_delay = max_delay
+        self.randomize = randomize
+        self.last_request_time = 0
+
+    def wait(self):
+        """waits appropriate time before next request"""
+        import random
+        elapsed = time.time() - self.last_request_time
+        if self.randomize:
+            delay = random.uniform(self.min_delay, self.max_delay)
+        else:
+            delay = self.min_delay
+        remaining = delay - elapsed
+        if remaining > 0:
+            time.sleep(remaining)
+        self.last_request_time = time.time()
+
+    def reset(self):
+        """resets the rate limiter"""
+        self.last_request_time = 0
+
+
+# global rate limiter instance with polite defaults
+_rate_limiter = RateLimiter(min_delay=1.0, max_delay=2.0)
+
+
+def set_rate_limit(min_delay=1.0, max_delay=2.0, randomize=True):
+    """configures the global rate limiter"""
+    global _rate_limiter
+    _rate_limiter = RateLimiter(min_delay, max_delay, randomize)
+
+
+def rate_limit_wait():
+    """applies rate limiting delay before a request"""
+    _rate_limiter.wait()
+
+
 # ----- RETRY MECHANISM -----
 
 def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=30.0, exceptions=(Exception,)):

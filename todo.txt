@@ -1,4 +1,3 @@
-Implement retry mechanism with exponential backoff for handling transient network failures gracefully
 Add configurable rate limiting with politeness delays between requests to respect server resources
 Create browser pool management for concurrent profile scraping with connection reuse
 Implement request timeout handling with configurable timeouts for page loads and element waits
