@@ -146,6 +146,83 @@ def scrape_user_reviews(target_url, paginate=True, max_pages=50):
     return reviews_array
 
 
+def scrape_user_diary(target_url, paginate=True, max_pages=100):
+    """
+    scrapes user's film diary with watch dates and rewatch info from letterboxd
+    """
+    base_diary_url = f"{target_url}films/diary/"
+    diary_entries = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        current_page = 1
+        try:
+            while True:
+                if current_page == 1:
+                    page_url = base_diary_url
+                else:
+                    page_url = f"{base_diary_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved diary page {page_url}")
+
+                entries = page.query_selector_all("tr.diary-entry-row")
+                if not entries:
+                    break
+
+                for entry in entries:
+                    entry_data = {
+                        "film_name": None,
+                        "film_slug": None,
+                        "watch_date": None,
+                        "rating": None,
+                        "rewatch": False,
+                        "liked": False,
+                        "has_review": False,
+                    }
+
+                    poster = entry.query_selector("td.td-film-details div.film-poster")
+                    if poster:
+                        entry_data["film_name"] = poster.get_attribute("data-film-name")
+                        entry_data["film_slug"] = poster.get_attribute("data-film-slug")
+
+                    date_el = entry.query_selector("td.td-calendar a")
+                    if date_el:
+                        entry_data["watch_date"] = date_el.get_attribute("href")
+
+                    rating_el = entry.query_selector("td.td-rating span.rating")
+                    if rating_el:
+                        entry_data["rating"] = rating_el.inner_text().strip()
+
+                    rewatch_el = entry.query_selector("td.td-rewatch span.icon-status-rewatch")
+                    if rewatch_el:
+                        entry_data["rewatch"] = True
+
+                    like_el = entry.query_selector("td.td-like span.icon-liked")
+                    if like_el:
+                        entry_data["liked"] = True
+
+                    review_el = entry.query_selector("td.td-review a.icon-review")
+                    if review_el:
+                        entry_data["has_review"] = True
+
+                    diary_entries.append(entry_data)
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process diary page {current_page}: {e}")
+        page.close()
+        browser.close()
+
+    return diary_entries
+
+
 def pretty_print_json(json_object):
     """
     pretty prints the json to
