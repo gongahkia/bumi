@@ -1181,6 +1181,174 @@ class PostgreSQLStorage:
         return False
 
 
+# ----- ASYNC SCRAPING -----
+
+async def async_scrape_user(target_url):
+    """
+    async version of user profile scraping using playwright async API
+    """
+    from playwright.async_api import async_playwright
+
+    start_time = time.time()
+    user_favourite_films_array = []
+    user_recent_activity_array = []
+    user_data = {}
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        try:
+            await page.goto(target_url)
+            print(f"Success: Retrieved page URL {target_url}")
+
+            main_div = await page.wait_for_selector("div#content div.content-wrap")
+            user_profile = await main_div.wait_for_selector("section.profile-header.js-profile-header")
+
+            if user_profile:
+                user_data_person = await user_profile.get_attribute("data-person")
+                profile_img = await user_profile.query_selector(
+                    "div.profile-summary.js-profile-summary div.profile-avatar span img"
+                )
+                user_profile_image = await profile_img.get_attribute("src") if profile_img else None
+
+                name_el = await user_profile.query_selector(
+                    "div.profile-summary.js-profile-summary div.profile-name-and-actions.js-profile-name-and-actions h1.person-display-name span"
+                )
+                user_name = await name_el.inner_text() if name_el else None
+
+                stats_els = await user_profile.query_selector_all(
+                    "div.profile-summary.js-profile-summary div.profile-info.js-profile-info div.profile-stats.js-profile-stats h4.profile-statistic"
+                )
+                user_statistics_array = []
+                for stat in stats_els:
+                    text = await stat.inner_text()
+                    user_statistics_array.append(text.strip())
+
+                bio_el = await user_profile.query_selector(
+                    "div.profile-summary.js-profile-summary div.profile-info.js-profile-info div.bio.js-bio div"
+                )
+                user_bio = await bio_el.inner_text() if bio_el else None
+
+            favourites = await main_div.query_selector("section#favourites")
+            if favourites:
+                films = await favourites.query_selector_all("ul.poster-list li.poster-container")
+                for film in films:
+                    poster = await film.query_selector("div.film-poster")
+                    if poster:
+                        film_name = await poster.get_attribute("data-film-name")
+                        img = await film.query_selector("div.film-poster div img")
+                        film_poster_image = await img.get_attribute("src") if img else None
+                        user_favourite_films_array.append({
+                            "film_name": film_name,
+                            "film_poster_image": film_poster_image,
+                        })
+
+            activity = await main_div.query_selector("section#recent-activity")
+            if activity:
+                films = await activity.query_selector_all("ul.poster-list li.poster-container")
+                for film in films:
+                    poster = await film.query_selector("div.film-poster")
+                    if poster:
+                        film_name = await poster.get_attribute("data-film-name")
+                        img = await film.query_selector("div.film-poster div img")
+                        film_poster_image = await img.get_attribute("src") if img else None
+                        user_recent_activity_array.append({
+                            "film_name": film_name,
+                            "film_poster_image": film_poster_image,
+                        })
+
+            user_data = {
+                "metadata": {
+                    "date_time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "target_url": target_url,
+                    "duration": time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time)),
+                },
+                "scraped_data": {
+                    "profile": {
+                        "user_name": user_name,
+                        "user_data_person": user_data_person,
+                        "user_bio": user_bio,
+                        "user_statistics": [" ".join(el.split("\n")).lower() for el in user_statistics_array],
+                        "user_profile_image": user_profile_image,
+                    },
+                    "films": {
+                        "favourite_films": user_favourite_films_array,
+                        "recent_activity": user_recent_activity_array,
+                        "watchlist": None,
+                    },
+                },
+            }
+
+        except Exception as e:
+            print(f"Error: Unable to process {target_url}: {e}")
+        await page.close()
+        await browser.close()
+
+    return user_data
+
+
+async def async_scrape_watchlist(target_url, max_pages=50):
+    """
+    async version of watchlist scraping with pagination
+    """
+    from playwright.async_api import async_playwright
+
+    base_url = f"{target_url}watchlist/"
+    watchlist = []
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        current_page = 1
+
+        try:
+            while current_page <= max_pages:
+                page_url = base_url if current_page == 1 else f"{base_url}page/{current_page}/"
+                await page.goto(page_url)
+                print(f"Success: Retrieved watchlist page {page_url}")
+
+                poster_list = await page.query_selector("ul.poster-list")
+                if not poster_list:
+                    break
+
+                posters = await poster_list.query_selector_all("li.poster-container")
+                if not posters:
+                    break
+
+                for poster in posters:
+                    div = await poster.query_selector("div")
+                    film_name = await div.get_attribute("data-film-name") if div else None
+                    img = await poster.query_selector("div img")
+                    film_poster = await img.get_attribute("src") if img else None
+                    watchlist.append({"film_name": film_name, "film_poster_image": film_poster})
+
+                next_link = await page.query_selector("a.next")
+                if not next_link:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process watchlist: {e}")
+        await page.close()
+        await browser.close()
+
+    return watchlist
+
+
+async def async_scrape_letterboxd(target_url):
+    """
+    async wrapper for complete user scraping
+    """
+    import asyncio
+    user_data, watchlist = await asyncio.gather(
+        async_scrape_user(target_url),
+        async_scrape_watchlist(target_url)
+    )
+    if watchlist:
+        user_data["scraped_data"]["films"]["watchlist"] = watchlist
+    return user_data
+
+
 # ----- HELPER FUNCTIONS -----
 
 

@@ -1,4 +1,3 @@
-Create PostgreSQL storage adapter for production-grade data persistence
 Build async scraping support using Playwright's async API for improved performance
 Implement batch profile scraping to process multiple usernames with aggregated results
 Add delta detection to compare current scrape against previous data and report changes
