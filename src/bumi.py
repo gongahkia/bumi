@@ -74,6 +74,78 @@ def scrape_film_details(film_slug):
     return film_details
 
 
+def scrape_user_reviews(target_url, paginate=True, max_pages=50):
+    """
+    scrapes user's film reviews with ratings from letterboxd
+    """
+    base_reviews_url = f"{target_url}films/reviews/"
+    reviews_array = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        current_page = 1
+        try:
+            while True:
+                if current_page == 1:
+                    page_url = base_reviews_url
+                else:
+                    page_url = f"{base_reviews_url}page/{current_page}/"
+                page.goto(page_url)
+                print(f"Success: Retrieved reviews page {page_url}")
+
+                review_items = page.query_selector_all("li.film-detail")
+                if not review_items:
+                    break
+
+                for item in review_items:
+                    review_data = {
+                        "film_name": None,
+                        "film_slug": None,
+                        "rating": None,
+                        "review_text": None,
+                        "review_date": None,
+                        "liked": False,
+                    }
+
+                    poster = item.query_selector("div.film-poster")
+                    if poster:
+                        review_data["film_name"] = poster.get_attribute("data-film-name")
+                        review_data["film_slug"] = poster.get_attribute("data-film-slug")
+
+                    rating_el = item.query_selector("span.rating")
+                    if rating_el:
+                        review_data["rating"] = rating_el.inner_text().strip()
+
+                    review_body = item.query_selector("div.body-text")
+                    if review_body:
+                        review_data["review_text"] = review_body.inner_text().strip()
+
+                    date_el = item.query_selector("span.date a")
+                    if date_el:
+                        review_data["review_date"] = date_el.inner_text().strip()
+
+                    like_el = item.query_selector("span.like.icon-liked")
+                    if like_el:
+                        review_data["liked"] = True
+
+                    reviews_array.append(review_data)
+
+                if not paginate:
+                    break
+
+                next_link = page.query_selector("a.next")
+                if not next_link or current_page >= max_pages:
+                    break
+                current_page += 1
+
+        except Exception as e:
+            print(f"Error: Unable to process reviews page {current_page}: {e}")
+        page.close()
+        browser.close()
+
+    return reviews_array
+
+
 def pretty_print_json(json_object):
     """
     pretty prints the json to

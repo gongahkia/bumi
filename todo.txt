@@ -1,4 +1,3 @@
-Add film detail extraction including release year, director, genre, runtime, and average rating from film pages
 Extract user's personal ratings and written reviews for each film they've logged
 Implement diary entry scraping to capture watch dates and rewatch history from user profiles
 Add list scraping capability to extract custom user-created lists with all films and list metadata
