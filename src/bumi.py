@@ -3352,3 +3352,134 @@ def get_popular_films(time_period="week", max_results=20):
         browser.close()
 
     return results
+
+
+# ----- ACTIVITY FEED -----
+
+def scrape_activity_feed(target_url, max_items=50):
+    """
+    scrapes activity feed from user's followed accounts
+
+    Args:
+        target_url: letterboxd user profile URL
+        max_items: maximum number of activity items to return
+
+    Returns:
+        list of activity items
+    """
+    feed_url = f"{target_url}activity/"
+    activities = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(feed_url)
+            print(f"Success: Retrieved activity feed {feed_url}")
+
+            activity_items = page.query_selector_all("section.activity-row")
+
+            for i, item in enumerate(activity_items):
+                if i >= max_items:
+                    break
+
+                activity_data = {
+                    "type": None,
+                    "user": None,
+                    "film_name": None,
+                    "film_slug": None,
+                    "rating": None,
+                    "review_snippet": None,
+                }
+
+                user_link = item.query_selector("a.avatar")
+                if user_link:
+                    activity_data["user"] = user_link.get_attribute("href").strip("/")
+
+                poster = item.query_selector("div.film-poster")
+                if poster:
+                    activity_data["film_name"] = poster.get_attribute("data-film-name")
+                    activity_data["film_slug"] = poster.get_attribute("data-film-slug")
+
+                rating_el = item.query_selector("span.rating")
+                if rating_el:
+                    activity_data["rating"] = rating_el.inner_text().strip()
+                    activity_data["type"] = "rating"
+
+                review_el = item.query_selector("div.body-text")
+                if review_el:
+                    activity_data["review_snippet"] = review_el.inner_text().strip()[:200]
+                    activity_data["type"] = "review"
+
+                if not activity_data["type"]:
+                    activity_data["type"] = "activity"
+
+                activities.append(activity_data)
+
+        except Exception as e:
+            print(f"Error getting activity feed: {e}")
+        page.close()
+        browser.close()
+
+    return activities
+
+
+def scrape_popular_reviews(film_slug, max_reviews=20):
+    """
+    scrapes popular reviews for a film
+
+    Args:
+        film_slug: letterboxd film slug
+        max_reviews: maximum number of reviews to return
+
+    Returns:
+        list of popular reviews
+    """
+    reviews_url = f"https://letterboxd.com/film/{film_slug}/reviews/by/activity/"
+    reviews = []
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(reviews_url)
+            print(f"Success: Getting popular reviews for {film_slug}")
+
+            review_items = page.query_selector_all("li.film-detail")
+
+            for i, item in enumerate(review_items):
+                if i >= max_reviews:
+                    break
+
+                review_data = {
+                    "user": None,
+                    "rating": None,
+                    "review_text": None,
+                    "likes_count": None,
+                    "date": None,
+                }
+
+                user_link = item.query_selector("a.avatar")
+                if user_link:
+                    review_data["user"] = user_link.get_attribute("href").strip("/")
+
+                rating_el = item.query_selector("span.rating")
+                if rating_el:
+                    review_data["rating"] = rating_el.inner_text().strip()
+
+                review_body = item.query_selector("div.body-text")
+                if review_body:
+                    review_data["review_text"] = review_body.inner_text().strip()
+
+                date_el = item.query_selector("span.date a")
+                if date_el:
+                    review_data["date"] = date_el.inner_text().strip()
+
+                reviews.append(review_data)
+
+        except Exception as e:
+            print(f"Error getting popular reviews: {e}")
+        page.close()
+        browser.close()
+
+    return reviews
