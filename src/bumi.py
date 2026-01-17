@@ -7,6 +7,73 @@ from playwright.sync_api import sync_playwright
 # ----- HELPER FUNCTIONS -----
 
 
+def scrape_film_details(film_slug):
+    """
+    scrapes detailed information for a specific film from letterboxd
+    """
+    film_url = f"https://letterboxd.com/film/{film_slug}/"
+    film_details = {
+        "film_slug": film_slug,
+        "title": None,
+        "year": None,
+        "director": None,
+        "runtime": None,
+        "genres": [],
+        "average_rating": None,
+        "tagline": None,
+        "description": None,
+    }
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        try:
+            page.goto(film_url)
+            print(f"Success: Retrieved film page {film_url}")
+
+            header = page.query_selector("section.film-header-group")
+            if header:
+                title_el = header.query_selector("h1.headline-1")
+                if title_el:
+                    film_details["title"] = title_el.inner_text().strip()
+                year_el = header.query_selector("small.number a")
+                if year_el:
+                    film_details["year"] = year_el.inner_text().strip()
+                director_el = header.query_selector("span.directorlist a")
+                if director_el:
+                    film_details["director"] = director_el.inner_text().strip()
+
+            tagline_el = page.query_selector("h4.tagline")
+            if tagline_el:
+                film_details["tagline"] = tagline_el.inner_text().strip()
+
+            desc_el = page.query_selector("div.truncate p")
+            if desc_el:
+                film_details["description"] = desc_el.inner_text().strip()
+
+            sidebar = page.query_selector("aside.sidebar")
+            if sidebar:
+                runtime_el = sidebar.query_selector("p.text-link")
+                if runtime_el:
+                    runtime_text = runtime_el.inner_text().strip()
+                    if "mins" in runtime_text.lower():
+                        film_details["runtime"] = runtime_text
+
+            genre_els = page.query_selector_all("div#tab-genres a.text-slug")
+            film_details["genres"] = [g.inner_text().strip() for g in genre_els]
+
+            rating_el = page.query_selector("a.tooltip.display-rating")
+            if rating_el:
+                rating_text = rating_el.inner_text().strip()
+                film_details["average_rating"] = rating_text
+
+        except Exception as e:
+            print(f"Error: Unable to process film {film_slug}: {e}")
+        page.close()
+        browser.close()
+
+    return film_details
+
+
 def pretty_print_json(json_object):
     """
     pretty prints the json to
