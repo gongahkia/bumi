@@ -132,6 +132,11 @@ from .search import (
     scrape_popular_reviews,
 )
 
+from .comparison import (
+    compare_users,
+    find_watch_recommendations,
+)
+
 __version__ = "1.0.0"
 __all__ = [
     # Exceptions
@@ -235,4 +240,7 @@ __all__ = [
     "get_popular_films",
     "scrape_activity_feed",
     "scrape_popular_reviews",
+    # Comparison
+    "compare_users",
+    "find_watch_recommendations",
 ]

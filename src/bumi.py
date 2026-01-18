@@ -146,4 +146,9 @@ from .search import (
     scrape_popular_reviews,
 )
 
+from .comparison import (
+    compare_users,
+    find_watch_recommendations,
+)
+
 __version__ = "1.0.0"

@@ -1,4 +1,3 @@
-Prepare the repository so Bumi could function as a Python library
 Implement user comparison feature to find common and unique films between two profiles
 Add genre and decade breakdown extraction from user's watched films statistics page
 Create recommendation engine that suggests films based on user's favourites and high-rated films
